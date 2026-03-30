@@ -1,6 +1,5 @@
 use anyhow::Result;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 pub struct SolanaClient {
@@ -9,7 +8,7 @@ pub struct SolanaClient {
     pub http: Client,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct BatchOnChain {
     pub batch_id: u64,
     pub total_units: u64,
@@ -46,19 +45,6 @@ impl SolanaClient {
         Ok(response)
     }
 
-    pub async fn get_account_info(&self, pubkey: &str) -> Result<Option<Value>> {
-        let result = self.rpc_call(
-            "getAccountInfo",
-            json!([pubkey, {"encoding": "base64"}])
-        ).await?;
-
-        if result["result"]["value"].is_null() {
-            return Ok(None);
-        }
-
-        Ok(Some(result["result"]["value"].clone()))
-    }
-
     pub async fn get_signatures_for_address(&self, address: &str) -> Result<Vec<String>> {
         let result = self.rpc_call(
             "getSignaturesForAddress",
@@ -73,5 +59,34 @@ impl SolanaClient {
             .collect();
 
         Ok(signatures)
+    }
+
+    pub async fn get_transaction(&self, signature: &str) -> Result<Value> {
+        let result = self.rpc_call(
+            "getTransaction",
+            json!([
+                signature,
+                {
+                    "encoding": "json",
+                    "commitment": "confirmed",
+                    "maxSupportedTransactionVersion": 0
+                }
+            ])
+        ).await?;
+
+        Ok(result["result"].clone())
+    }
+
+    pub async fn get_account_info(&self, pubkey: &str) -> Result<Option<Value>> {
+        let result = self.rpc_call(
+            "getAccountInfo",
+            json!([pubkey, {"encoding": "base64"}])
+        ).await?;
+
+        if result["result"]["value"].is_null() {
+            return Ok(None);
+        }
+
+        Ok(Some(result["result"]["value"].clone()))
     }
 }
