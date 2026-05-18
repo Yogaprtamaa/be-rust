@@ -15,6 +15,8 @@ pub struct Allocation {
     pub burn_amount: Decimal,
     pub nft_id: Option<String>,
     pub tx_hash: Option<String>,
+    pub batch_id: Option<Uuid>,
+    pub refund_tx_hash: Option<String>,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }

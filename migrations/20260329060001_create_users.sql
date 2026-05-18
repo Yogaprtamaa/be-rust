@@ -5,4 +5,4 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_wallet ON users(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_users_wallet ON users(wallet_address);

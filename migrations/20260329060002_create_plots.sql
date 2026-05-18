@@ -23,5 +23,5 @@ CREATE TABLE IF NOT EXISTS plots (
     )
 );
 
-CREATE INDEX idx_plots_block ON plots(block_id);
-CREATE INDEX idx_plots_status ON plots(status);
+CREATE INDEX IF NOT EXISTS idx_plots_block ON plots(block_id);
+CREATE INDEX IF NOT EXISTS idx_plots_status ON plots(status);

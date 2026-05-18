@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS nft_records (
     )
 );
 
-CREATE INDEX idx_nft_wallet ON nft_records(wallet_address);
-CREATE INDEX idx_nft_plot ON nft_records(plot_id);
+CREATE INDEX IF NOT EXISTS idx_nft_wallet ON nft_records(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_nft_plot ON nft_records(plot_id);

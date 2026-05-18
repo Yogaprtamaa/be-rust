@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS allocations (
     )
 );
 
-CREATE INDEX idx_allocations_wallet ON allocations(wallet_address);
-CREATE INDEX idx_allocations_plot ON allocations(plot_id);
-CREATE INDEX idx_allocations_status ON allocations(status);
-CREATE INDEX idx_allocations_tx ON allocations(tx_hash);
+CREATE INDEX IF NOT EXISTS idx_allocations_wallet ON allocations(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_allocations_plot ON allocations(plot_id);
+CREATE INDEX IF NOT EXISTS idx_allocations_status ON allocations(status);
+CREATE INDEX IF NOT EXISTS idx_allocations_tx ON allocations(tx_hash);

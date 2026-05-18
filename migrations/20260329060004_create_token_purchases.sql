@@ -13,6 +13,6 @@ CREATE TABLE IF NOT EXISTS token_purchases (
     )
 );
 
-CREATE INDEX idx_purchases_wallet ON token_purchases(wallet_address);
-CREATE INDEX idx_purchases_status ON token_purchases(status);
-CREATE INDEX idx_purchases_tx ON token_purchases(tx_hash);
+CREATE INDEX IF NOT EXISTS idx_purchases_wallet ON token_purchases(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_purchases_status ON token_purchases(status);
+CREATE INDEX IF NOT EXISTS idx_purchases_tx ON token_purchases(tx_hash);

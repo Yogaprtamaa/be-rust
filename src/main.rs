@@ -42,6 +42,29 @@ async fn main() {
 
     tracing::info!("Koneksi Supabase berhasil");
 
+    // Hapus record migrasi rekonstruksi yang hilang dari git agar bisa di-re-apply
+    let stale_versions: &[i64] = &[
+        20260329055999,
+        20260329060001,
+        20260329060002,
+        20260329060003,
+        20260329060004,
+        20260329060005,
+        20260329060006,
+        20260329060007,
+        20260329060008,
+        20260329060009,
+        20260329060010,
+        20260401000100,
+    ];
+    for version in stale_versions {
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version = $1")
+            .bind(*version)
+            .execute(&db)
+            .await
+            .ok();
+    }
+
     sqlx::migrate!("./migrations")
         .run(&db)
         .await
