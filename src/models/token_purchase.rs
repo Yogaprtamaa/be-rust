@@ -13,6 +13,8 @@ pub struct TokenPurchase {
     pub rate_used: Decimal,
     pub tx_hash: Option<String>,
     pub status: String,
+    pub referrer_wallet: Option<String>,
+    pub referral_bonus: Option<i64>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -20,6 +22,7 @@ pub struct TokenPurchase {
 pub struct CreateTokenPurchaseRequest {
     pub usdt_amount: Decimal,
     pub tx_hash: String,
+    pub referrer_wallet: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

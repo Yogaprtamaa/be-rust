@@ -13,7 +13,6 @@ pub struct Config {
     // Wallet addresses
     pub sale_inventory_wallet: String,
     pub usdt_treasury_wallet: String,
-    pub tani_treasury_wallet: String,
     // Rate
     pub tani_per_usdt: f64,
 }
@@ -40,8 +39,6 @@ impl Config {
             sale_inventory_wallet: env::var("SALE_INVENTORY_WALLET")
                 .unwrap_or_default(),
             usdt_treasury_wallet: env::var("USDT_TREASURY_WALLET")
-                .unwrap_or_default(),
-            tani_treasury_wallet: env::var("TANI_TREASURY_WALLET")
                 .unwrap_or_default(),
             tani_per_usdt: env::var("TANI_PER_USDT")
                 .unwrap_or("10.0".to_string())

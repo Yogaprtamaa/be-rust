@@ -1,5 +1,6 @@
 use axum::{
     extract::{Extension, State},
+    http::HeaderMap,
     routing::{get, post},
     Json, Router,
 };
@@ -19,7 +20,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/token-sale/buy", post(buy_tani))
 }
 
-// Preview sebelum beli — tampilkan estimasi TANI yang diterima
 async fn preview_purchase(
     State(state): State<Arc<AppState>>,
     Extension(auth_user): Extension<AuthUser>,
@@ -31,27 +31,22 @@ async fn preview_purchase(
         "wallet": auth_user.wallet,
         "tani_mint": state.config.tani_mint,
         "usdt_mint": state.config.usdt_mint,
-        "note": "Masukkan jumlah USDT untuk estimasi $TANI yang diterima"
     })))
 }
 
-// Catat pembelian $TANI setelah transaksi on-chain berhasil
 async fn buy_tani(
     State(state): State<Arc<AppState>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(body): Json<CreateTokenPurchaseRequest>,
-) -> AppResult<Json<TokenPurchase>> {
+) -> AppResult<(HeaderMap, Json<TokenPurchase>)> {
     if body.usdt_amount <= Decimal::ZERO {
-        return Err(AppError::BadRequest(
-            "Jumlah USDT harus lebih dari 0".to_string(),
-        ));
+        return Err(AppError::BadRequest("Jumlah USDT harus lebih dari 0".to_string()));
     }
 
-    if !body.tx_hash.starts_with("") || body.tx_hash.len() < 32 {
+    if body.tx_hash.len() < 32 {
         return Err(AppError::BadRequest("tx_hash tidak valid".to_string()));
     }
 
-    // Cek tx_hash tidak duplikat
     let existing = sqlx::query!(
         "SELECT purchase_id FROM token_purchases WHERE tx_hash = $1",
         body.tx_hash
@@ -60,9 +55,7 @@ async fn buy_tani(
     .await?;
 
     if existing.is_some() {
-        return Err(AppError::BadRequest(
-            "Transaksi sudah diproses".to_string(),
-        ));
+        return Err(AppError::BadRequest("Transaksi sudah diproses".to_string()));
     }
 
     let rate = Decimal::try_from(state.config.tani_per_usdt)
@@ -74,18 +67,22 @@ async fn buy_tani(
         TokenPurchase,
         r#"
         INSERT INTO token_purchases
-            (wallet_address, usdt_amount, tani_amount, rate_used, tx_hash, status)
-        VALUES ($1, $2, $3, $4, $5, 'success')
+            (wallet_address, usdt_amount, tani_amount, rate_used, tx_hash, status, referrer_wallet)
+        VALUES ($1, $2, $3, $4, $5, 'success', $6)
         RETURNING *
         "#,
         auth_user.wallet,
         body.usdt_amount,
         tani_amount,
         rate,
-        body.tx_hash
+        body.tx_hash,
+        body.referrer_wallet,
     )
     .fetch_one(&state.db)
     .await?;
 
-    Ok(Json(purchase))
+    let mut headers = HeaderMap::new();
+    headers.insert("X-Tx-Verified", "false".parse().unwrap());
+
+    Ok((headers, Json(purchase)))
 }

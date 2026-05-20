@@ -8,15 +8,6 @@ pub struct SolanaClient {
     pub http: Client,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct BatchOnChain {
-    pub batch_id: u64,
-    pub total_units: u64,
-    pub sold_units: u64,
-    pub price_per_unit: u64,
-    pub is_active: bool,
-}
-
 impl SolanaClient {
     pub fn new(rpc_url: &str, program_id: &str) -> Self {
         SolanaClient {

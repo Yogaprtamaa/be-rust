@@ -36,6 +36,9 @@ pub async fn require_auth(
         .and_then(|v| v.strip_prefix("Bearer "))
         .ok_or_else(|| AppError::Unauthorized("Token tidak ada".to_string()))?;
 
+    // TODO(mainnet-blocker): implement wallet signature verification
+    // Reference: https://docs.solana.com/developing/clients/javascript-api#signing-messages
+    // Tanpa ini, siapapun bisa claim jadi wallet apapun — BLOCKER sebelum mainnet.
     let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),

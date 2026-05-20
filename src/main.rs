@@ -56,6 +56,7 @@ async fn main() {
         20260329060009,
         20260329060010,
         20260401000100,
+        20260520000001,
     ];
     for version in stale_versions {
         sqlx::query("DELETE FROM _sqlx_migrations WHERE version = $1")
@@ -83,11 +84,11 @@ async fn main() {
 
     let public_routes = Router::new()
         .merge(routes::auth::router())
-        .merge(routes::plot::router());
+        .merge(routes::plot::router())
+        .merge(routes::referral::router());
 
     let protected_routes = Router::new()
         .merge(routes::token_sale::router())
-        .merge(routes::allocation::router())
         .merge(routes::portfolio::router())
         .layer(from_fn_with_state(
             state.clone(),

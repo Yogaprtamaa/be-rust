@@ -75,16 +75,14 @@ async fn process_transaction(
         .filter_map(|l| l.as_str().map(|s| s.to_string()))
         .collect();
 
-    // Detect TokenPurchased event
-    if log_strings.iter().any(|l| l.contains("Token Sale:")) {
-        tracing::info!("TokenPurchased event: {}", sig);
+    // Detect ReferralEvent (buy_tani_referred) — check first, more specific
+    if log_strings.iter().any(|l| l.contains("Referral:")) {
+        tracing::info!("ReferralEvent: {}", sig);
+        handle_referral(sig, &log_strings, state).await;
+    // Detect TokenSaleEvent (buy_tani without referrer)
+    } else if log_strings.iter().any(|l| l.contains("Token Sale:")) {
+        tracing::info!("TokenSaleEvent: {}", sig);
         handle_token_purchase(sig, &log_strings, state).await;
-    }
-
-    // Detect PlotAllocated event
-    if log_strings.iter().any(|l| l.contains("Allocation:")) {
-        tracing::info!("PlotAllocated event: {}", sig);
-        handle_plot_allocation(sig, &log_strings, state).await;
     }
 }
 
@@ -93,7 +91,8 @@ async fn handle_token_purchase(
     logs: &[String],
     state: &Arc<AppState>,
 ) {
-    // Parse log: "Token Sale: X USDT → Y TANI"
+    // Parse log: "Token Sale: wallet=... usdt=X tani_received=Y"
+    // Field mapping: event.wallet (bukan buyer), event.tani_received (bukan tani_amount)
     let sale_log = logs.iter().find(|l| l.contains("Token Sale:"));
 
     if let Some(log) = sale_log {
@@ -117,61 +116,56 @@ async fn handle_token_purchase(
     }
 }
 
-async fn handle_plot_allocation(
+async fn handle_referral(
     sig: &str,
     logs: &[String],
     state: &Arc<AppState>,
 ) {
-    // Parse log: "Allocation: plot=C7 tani=100 treasury=70 burn=30 nft=Z4-PLOT-C7-xxx"
-    let alloc_log = logs.iter().find(|l| l.contains("Allocation:"));
+    // Log format: "Referral: buyer=<PK> referrer=<PK> usdt=<u64> bonus=<u64> tani=<u64>"
+    let ref_log = match logs.iter().find(|l| l.contains("Referral:")) {
+        Some(l) => l,
+        None => return,
+    };
 
-    if let Some(log) = alloc_log {
-        tracing::info!("Processing allocation: {}", log);
+    tracing::info!("Processing referral: {}", ref_log);
 
-        // Extract plot_id dari log
-        let plot_id = extract_value(log, "plot=");
-        let nft_id = extract_value(log, "nft=");
+    let buyer    = extract_value(ref_log, "buyer=");
+    let referrer = extract_value(ref_log, "referrer=");
+    let usdt     = extract_value(ref_log, "usdt=").and_then(|v| v.parse::<i64>().ok());
+    let bonus    = extract_value(ref_log, "bonus=").and_then(|v| v.parse::<i64>().ok());
+    let tani     = extract_value(ref_log, "tani=").and_then(|v| v.parse::<i64>().ok());
 
-        if let (Some(plot_id), Some(nft_id)) = (plot_id, nft_id) {
-            // Update allocation status
+    match (buyer, referrer, usdt, bonus, tani) {
+        (Some(buyer), Some(referrer), Some(usdt_amt), Some(bonus_amt), Some(tani_recv)) => {
+            let sig_str: &str = sig;
+            let referrer_str: &str = &referrer;
+            let buyer_str: &str = &buyer;
+
             match sqlx::query!(
-                "UPDATE allocations SET status = 'success' WHERE tx_hash = $1 AND status = 'pending'",
-                sig
+                r#"INSERT INTO referral_earnings
+                   (referrer_wallet, buyer_wallet, usdt_amount, referral_bonus, tani_received, tx_hash)
+                   VALUES ($1, $2, $3, $4, $5, $6)
+                   ON CONFLICT (tx_hash) DO NOTHING"#,
+                referrer_str, buyer_str, usdt_amt, bonus_amt, tani_recv, sig_str
             )
             .execute(&state.db)
             .await
             {
-                Ok(result) => {
-                    if result.rows_affected() > 0 {
-                        tracing::info!("Allocation confirmed: {} plot={} nft={}", sig, plot_id, nft_id);
-                    }
-                }
-                Err(e) => tracing::error!("DB error update allocation: {}", e),
+                Ok(r) => tracing::info!("Referral earning recorded ({} rows): {}", r.rows_affected(), sig),
+                Err(e) => tracing::error!("DB error insert referral_earning: {}", e),
             }
 
-            // Update plot capacity
-            match sqlx::query!(
-                r#"
-                UPDATE plots
-                SET allocated_capacity = allocated_capacity + 1,
-                    remaining_capacity = remaining_capacity - 1,
-                    status = CASE
-                        WHEN remaining_capacity - 1 = 0 THEN 'filled'
-                        WHEN remaining_capacity - 1 < 50 THEN 'limited'
-                        ELSE status
-                    END,
-                    updated_at = NOW()
-                WHERE plot_id = $1
-                "#,
-                plot_id
+            // Also confirm the token_purchase row
+            sqlx::query!(
+                "UPDATE token_purchases SET status = 'success', referrer_wallet = $2
+                 WHERE tx_hash = $1 AND status = 'pending'",
+                sig_str, referrer_str
             )
             .execute(&state.db)
             .await
-            {
-                Ok(_) => tracing::info!("Plot {} capacity updated", plot_id),
-                Err(e) => tracing::error!("DB error update plot: {}", e),
-            }
+            .ok();
         }
+        _ => tracing::warn!("Could not parse Referral log: {}", ref_log),
     }
 }
 
