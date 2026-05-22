@@ -75,7 +75,7 @@ async fn get_portfolio(
     // Riwayat pembelian $TANI
     let purchases = sqlx::query!(
         r#"
-        SELECT purchase_id, usdt_amount, tani_amount, rate_used, tx_hash, status, created_at
+        SELECT purchase_id, usdt_amount, tani_amount, rate_used, tx_hash, status, created_at, referrer_wallet
         FROM token_purchases
         WHERE wallet_address = $1
         ORDER BY created_at DESC
@@ -96,7 +96,8 @@ async fn get_portfolio(
                 "rate_used": p.rate_used,
                 "tx_hash": p.tx_hash,
                 "status": p.status,
-                "created_at": p.created_at
+                "created_at": p.created_at,
+                "referrer_wallet": p.referrer_wallet
             })
         })
         .collect();
