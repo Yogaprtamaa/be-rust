@@ -121,7 +121,8 @@ async fn handle_referral(
     logs: &[String],
     state: &Arc<AppState>,
 ) {
-    // Log format: "Referral: buyer=<PK> referrer=<PK> usdt=<u64> bonus=<u64> tani=<u64>"
+    // Actual log format from contract msg!:
+    // "Token Sale (Referral): {usdt_raw} USDT → {tani_raw} TANI | referrer={pubkey} bonus={bonus_raw} USDT"
     let ref_log = match logs.iter().find(|l| l.contains("Referral:")) {
         Some(l) => l,
         None => return,
@@ -129,11 +130,20 @@ async fn handle_referral(
 
     tracing::info!("Processing referral: {}", ref_log);
 
-    let buyer    = extract_value(ref_log, "buyer=");
     let referrer = extract_value(ref_log, "referrer=");
-    let usdt     = extract_value(ref_log, "usdt=").and_then(|v| v.parse::<i64>().ok());
     let bonus    = extract_value(ref_log, "bonus=").and_then(|v| v.parse::<i64>().ok());
-    let tani     = extract_value(ref_log, "tani=").and_then(|v| v.parse::<i64>().ok());
+    let usdt     = parse_number_after(ref_log, "Referral): ");
+    let tani     = parse_number_before(ref_log, " TANI");
+
+    // buyer is not in the msg! log — get it from token_purchases (inserted by recordTokenPurchase)
+    let buyer = sqlx::query_scalar!(
+        "SELECT wallet_address FROM token_purchases WHERE tx_hash = $1",
+        sig
+    )
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
 
     match (buyer, referrer, usdt, bonus, tani) {
         (Some(buyer), Some(referrer), Some(usdt_amt), Some(bonus_amt), Some(tani_recv)) => {
@@ -155,7 +165,6 @@ async fn handle_referral(
                 Err(e) => tracing::error!("DB error insert referral_earning: {}", e),
             }
 
-            // Also confirm the token_purchase row
             sqlx::query!(
                 "UPDATE token_purchases SET status = 'success', referrer_wallet = $2
                  WHERE tx_hash = $1 AND status = 'pending'",
@@ -174,4 +183,20 @@ fn extract_value(log: &str, key: &str) -> Option<String> {
     let rest = &log[start..];
     let end = rest.find(' ').unwrap_or(rest.len());
     Some(rest[..end].to_string())
+}
+
+// Parse the first number immediately after `key` (e.g., "Referral): " → "1000000")
+fn parse_number_after(log: &str, key: &str) -> Option<i64> {
+    let start = log.find(key)? + key.len();
+    let rest = &log[start..];
+    let end = rest.find(' ').unwrap_or(rest.len());
+    rest[..end].parse().ok()
+}
+
+// Parse the number immediately before `suffix` (e.g., " TANI" → "1700000000")
+fn parse_number_before(log: &str, suffix: &str) -> Option<i64> {
+    let pos = log.find(suffix)?;
+    let before = log[..pos].trim();
+    let num_start = before.rfind(' ').map(|i| i + 1).unwrap_or(0);
+    before[num_start..].parse().ok()
 }
