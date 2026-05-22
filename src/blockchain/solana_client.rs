@@ -39,7 +39,7 @@ impl SolanaClient {
     pub async fn get_signatures_for_address(&self, address: &str) -> Result<Vec<String>> {
         let result = self.rpc_call(
             "getSignaturesForAddress",
-            json!([address, {"limit": 10}])
+            json!([address, {"limit": 100}])
         ).await?;
 
         let signatures = result["result"]
