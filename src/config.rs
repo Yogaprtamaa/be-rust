@@ -41,9 +41,9 @@ impl Config {
             usdt_treasury_wallet: env::var("USDT_TREASURY_WALLET")
                 .unwrap_or_default(),
             tani_per_usdt: env::var("TANI_PER_USDT")
-                .unwrap_or("1.7".to_string())
+                .unwrap_or("5.3".to_string())
                 .parse()
-                .unwrap_or(1.7),
+                .unwrap_or(5.3),
         }
     }
 }

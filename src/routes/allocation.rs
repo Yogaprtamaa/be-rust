@@ -107,7 +107,7 @@ async fn create_allocation(
 
     // Generate NFT ID
     let nft_id = format!(
-        "Z4-PLOT-{}-{:06}",
+        "SEEDRYM-PLOT-{}-{:06}",
         body.plot_id.to_uppercase(),
         rand_nft_id()
     );

@@ -1,3 +1,7 @@
 /target
+
+# `*.env` hanya cocok untuk file yang BERAKHIRAN .env — `.env.local` lolos dari pola itu.
+# Pola `.env*` di bawah yang benar-benar menutup celahnya.
 .env
 *.env
+.env*

@@ -27,7 +27,7 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or("z4_backend=debug".to_string())
+            std::env::var("RUST_LOG").unwrap_or("seedrym_backend=debug".to_string())
         )
         .init();
 
@@ -90,6 +90,7 @@ async fn main() {
     let protected_routes = Router::new()
         .merge(routes::token_sale::router())
         .merge(routes::portfolio::router())
+        .merge(routes::allocation::router())
         .layer(from_fn_with_state(
             state.clone(),
             crate::middleware::auth::require_auth,
@@ -105,6 +106,6 @@ async fn main() {
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
 
-    tracing::info!("Z4 backend jalan di http://{}", addr);
+    tracing::info!("Seedrym backend jalan di http://{}", addr);
     axum::serve(listener, app).await.unwrap();
 }
