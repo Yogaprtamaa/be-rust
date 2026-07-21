@@ -22,6 +22,7 @@ pub struct Claims {
 pub struct AuthUser {
     pub user_id: Uuid,
     pub wallet: String,
+    pub is_admin: bool,
 }
 
 pub async fn require_auth(
@@ -46,14 +47,36 @@ pub async fn require_auth(
     )
     .map_err(|_| AppError::Unauthorized("Token tidak valid".to_string()))?;
 
+    let wallet = token_data.claims.wallet;
+
     let auth_user = AuthUser {
         user_id: Uuid::parse_str(&token_data.claims.sub)
             .map_err(|_| AppError::Unauthorized("User ID tidak valid".to_string()))?,
-        wallet: token_data.claims.wallet,
+        // Admin dihitung ulang dari config tiap request, bukan dari isi token —
+        // ganti ADMIN_WALLET langsung mencabut akses token lama.
+        is_admin: wallet == state.config.admin_wallet,
+        wallet,
     };
 
     // Inject AuthUser ke request extensions, bisa diambil di handler
     request.extensions_mut().insert(auth_user);
+
+    Ok(next.run(request).await)
+}
+
+/// Dipasang SETELAH require_auth. Menolak siapapun yang bukan ADMIN_WALLET.
+pub async fn require_admin(request: Request, next: Next) -> Result<Response, AppError> {
+    let is_admin = request
+        .extensions()
+        .get::<AuthUser>()
+        .map(|u| u.is_admin)
+        .unwrap_or(false);
+
+    if !is_admin {
+        // 403, bukan 401 — token-nya sah, wallet-nya saja yang bukan admin.
+        // 401 akan bikin api-client FE menghapus token dan logout paksa.
+        return Err(AppError::Forbidden("Akses admin ditolak".to_string()));
+    }
 
     Ok(next.run(request).await)
 }

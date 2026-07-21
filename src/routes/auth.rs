@@ -20,6 +20,7 @@ pub struct LoginResponse {
     pub token: String,
     pub user_id: String,
     pub wallet_address: String,
+    pub is_admin: bool,
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -30,11 +31,11 @@ async fn login(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LoginRequest>,
 ) -> AppResult<Json<LoginResponse>> {
-    if body.wallet_address.len() < 32 || body.wallet_address.len() > 44 {
+    let wallet = body.wallet_address.trim().to_string();
+
+    if !crate::config::is_valid_pubkey(&wallet) {
         return Err(AppError::BadRequest("Wallet address tidak valid".to_string()));
     }
-
-    let wallet = body.wallet_address.trim().to_string();
 
     // Upsert user — kalau belum ada buat baru, kalau ada return yang existing
     let user = sqlx::query!(
@@ -69,6 +70,7 @@ async fn login(
     Ok(Json(LoginResponse {
         token,
         user_id: user.user_id.to_string(),
+        is_admin: user.wallet_address == state.config.admin_wallet,
         wallet_address: user.wallet_address,
     }))
 }

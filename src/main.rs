@@ -85,7 +85,8 @@ async fn main() {
     let public_routes = Router::new()
         .merge(routes::auth::router())
         .merge(routes::plot::router())
-        .merge(routes::referral::router());
+        .merge(routes::referral::router())
+        .merge(routes::waitlist::router());
 
     let protected_routes = Router::new()
         .merge(routes::token_sale::router())
@@ -96,9 +97,22 @@ async fn main() {
             crate::middleware::auth::require_auth,
         ));
 
+    // require_admin dipasang di dalam require_auth — urutan layer axum dari bawah
+    // ke atas, jadi require_auth jalan duluan dan AuthUser sudah ada.
+    let admin_routes = Router::new()
+        .merge(routes::admin::router())
+        .layer(axum::middleware::from_fn(
+            crate::middleware::auth::require_admin,
+        ))
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::middleware::auth::require_auth,
+        ));
+
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
+        .merge(admin_routes)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
